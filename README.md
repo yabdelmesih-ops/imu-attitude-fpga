@@ -252,7 +252,9 @@ Yosys estimate for the HIL build on the XC7A35T: ~980 LUTs, 825 flip-flops, 3 DS
    py tools\hil_run.py --port COM5 --plot hil_results.png --csv hil_results.csv
    ```
    The Au appears as two COM ports in Device Manager; the UART is usually the higher number.
-4. Expect `HIL PASS: hardware output is bit-exact with the model`. LED0 blinks while data
+4. Expect `HIL PASS: hardware output is bit-exact with the model`. On the board, LED0 is the top LED
+   of the column and LED7 the bottom. Verified on hardware: after reset only LED5 (level) is lit; after a
+   passing 20,000-sample run, LED1 (calibrated) and LED5 are lit and the error LEDs (LED2, LED3) are off. LED0 blinks while data
    flows, LED1 lights after gyro calibration, LED2 = a corrupted input frame was seen,
    LED3 = a result was dropped (should never light).
 

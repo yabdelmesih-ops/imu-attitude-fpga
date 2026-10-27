@@ -43,7 +43,7 @@ module attitude_core #(
 );
     localparam int W = 24;
 
-    typedef enum logic [2:0] {S_IDLE, S_ROLL, S_SCALE, S_PITCH, S_UPDATE} state_t;
+    typedef enum logic [2:0] {S_IDLE, S_ROLL, S_SCALE, S_PITCH, S_ERR, S_UPDATE} state_t;
     state_t state;
 
     // Latched sample
@@ -56,8 +56,18 @@ module attitude_core #(
     logic [CAL_LOG2-1:0]  cal_cnt;
     wire  signed [31:0]   sum_x_next = sum_x + 32'(gx_r);
     wire  signed [31:0]   sum_y_next = sum_y + 32'(gy_r);
-    wire  signed [16:0]   rate_x = 17'(gx_r) - 17'(bias_x);
-    wire  signed [16:0]   rate_y = 17'(gy_r) - 17'(bias_y);
+
+    // Pipelined filter update (timing closure at 100 MHz).
+    // The complementary-filter step  angle' = pred + ((acc - pred) >>> ALPHA_SHIFT),
+    // pred = angle + (rate * GYRO_K) >>> GYRO_SHIFT,  was one 14-level path
+    // (multiply -> add -> subtract -> add). It is now split into registered
+    // stages. All but the last two run while the CORDIC is busy with pitch,
+    // so the whole update adds only one cycle of latency. The arithmetic is
+    // unchanged, so results stay bit-exact with model/fixed_model.py.
+    logic signed [16:0] rate_x_r, rate_y_r;   // gyro minus bias      (S_SCALE)
+    logic        [31:0] d_x, d_y;             // gyro angle increment (S_PITCH)
+    logic        [31:0] pred_r, pred_p;       // gyro prediction      (S_PITCH)
+    logic signed [31:0] err_r, err_p;         // accel - prediction   (S_PITCH / S_ERR)
 
     // CORDIC interface
     logic                c_start, c_busy, c_done;
@@ -75,18 +85,11 @@ module attitude_core #(
         to_cordic = W'(v) <<< IN_SHIFT;
     endfunction
 
-    // One complementary-filter update. All angle math is modulo 2^32.
-    function automatic logic [31:0] cf_update(input logic [31:0] angle,
-                                              input logic [31:0] acc_angle,
-                                              input logic signed [16:0] rate);
+    // Gyro rate -> angle increment, modulo 2^32 (signed 17-bit x constant)
+    function automatic logic [31:0] gyro_step(input logic signed [16:0] rate);
         logic signed [47:0] prod;
-        logic        [31:0] d, pred;
-        logic signed [31:0] err;
-        prod = 48'(rate) * 48'(GYRO_K);           // signed 17-bit x constant
-        d    = 32'(prod >>> GYRO_SHIFT);
-        pred = angle + d;
-        err  = $signed(acc_angle - pred);
-        cf_update = pred + 32'(err >>> ALPHA_SHIFT);
+        prod = 48'(rate) * 48'(GYRO_K);
+        gyro_step = 32'(prod >>> GYRO_SHIFT);
     endfunction
 
     // Magnitude correction r' = (r * KINV) >> 16
@@ -115,6 +118,14 @@ module attitude_core #(
             cal_done  <= 1'b0;
             c_x       <= '0;
             c_y       <= '0;
+            rate_x_r  <= '0;
+            rate_y_r  <= '0;
+            d_x       <= '0;
+            d_y       <= '0;
+            pred_r    <= '0;
+            pred_p    <= '0;
+            err_r     <= '0;
+            err_p     <= '0;
         end else begin
             case (state)
                 S_IDLE: if (in_valid) begin
@@ -135,11 +146,26 @@ module attitude_core #(
                     c_x     <= W'(mag_prod >>> 16);
                     c_y     <= -to_cordic(ax_r);
                     c_start <= 1'b1;
+                    rate_x_r <= 17'(gx_r) - 17'(bias_x);
+                    rate_y_r <= 17'(gy_r) - 17'(bias_y);
                     state   <= S_PITCH;
                 end
-                S_PITCH: if (c_done) begin
-                    acc_pitch <= c_angle;
-                    state     <= S_UPDATE;
+                S_PITCH: begin
+                    // Filter pipeline, one stage per cycle while the CORDIC runs
+                    // (its 17+ cycles are far more than the 3 stages need).
+                    d_x    <= gyro_step(rate_x_r);
+                    d_y    <= gyro_step(rate_y_r);
+                    pred_r <= roll  + d_x;
+                    pred_p <= pitch + d_y;
+                    err_r  <= $signed(acc_roll - pred_r);
+                    if (c_done) begin
+                        acc_pitch <= c_angle;
+                        state     <= S_ERR;
+                    end
+                end
+                S_ERR: begin
+                    err_p <= $signed(acc_pitch - pred_p);
+                    state <= S_UPDATE;
                 end
                 S_UPDATE: begin
                     if (!init_done) begin           // seed from the accelerometer
@@ -147,8 +173,8 @@ module attitude_core #(
                         pitch     <= acc_pitch;
                         init_done <= 1'b1;
                     end else begin
-                        roll  <= cf_update(roll,  acc_roll,  rate_x);
-                        pitch <= cf_update(pitch, acc_pitch, rate_y);
+                        roll  <= pred_r + 32'(err_r >>> ALPHA_SHIFT);
+                        pitch <= pred_p + 32'(err_p >>> ALPHA_SHIFT);
                     end
                     if (!cal_done) begin
                         sum_x   <= sum_x_next;

@@ -34,7 +34,7 @@ CORDIC up through the full SPI → filter → UART chain.
 * From t = 2 s (after calibration and settling) up to the deliberate 0.3 g, 0.2 s bump,
   filter RMS error is **0.08° roll / 0.07° pitch**.
 * Fixed-point vs. double-precision filter: **0.0018°** worst-case difference.
-* Latency: **39 clock cycles** per sample (0.39 µs at the Alchitry Au's 100 MHz clock),
+* Latency: **40 clock cycles** per sample (0.40 µs at the Alchitry Au's 100 MHz clock),
   against a 1 ms budget.
 * The test trajectory includes a full 360° roll through the ±180° wrap.
 
@@ -88,6 +88,10 @@ cd sim && ./run_all.sh --all-boards    # also runs the system test on the Tang N
   is `GYRO_K / 2⁸` BAM counts per LSB per sample (scale error 0.002 %).
 * **Filter.** `pred = angle + gyro·dt` and `angle = pred + (accel_angle − pred) >> 9`.
   α = 1 − 2⁻⁹ makes the blend a shift instead of a multiply (time constant ≈ 0.51 s).
+* **Timing closure.** The first Vivado build of the update step (multiply, add, subtract, shift,
+  add in one cycle) failed at 100 MHz with WNS = −1.463 ns across 14 logic levels. The update is now
+  pipelined into registered stages that run while the CORDIC computes pitch, costing one cycle
+  of latency (39 → 40) with bit-identical results.
 * **Gyro bias calibration.** The first 1,024 samples are averaged per gyro axis
   and subtracted afterwards. Hold the board still for ~1 s after reset (LED2 lights on the Au).
 * **CDC.** MISO and the reset button pass through synchronizers; the SPI master
@@ -182,7 +186,7 @@ Use a **+3.3 V** pin for VCC, not the +5 V pins (A1, A50).
 ### Alternate boards
 * **Tang Nano 9K** (Gowin GW1NR-9, 27 MHz): `boards/tang_nano_9k/`. IMU on header pins
   25 (CS), 26 (MOSI), 27 (MISO), 28 (SCLK) on a 3.3 V bank; six active-low LEDs.
-  Latency is 1.44 µs at 27 MHz.
+  Latency is 1.48 µs at 27 MHz.
 * **Basys 3** (Artix-7, Vivado): `boards/basys3/`. IMU on Pmod JA: JA1 = NCS, JA2 = MOSI,
   JA3 = MISO, JA4 = SCLK, JA5 = GND, JA6 = 3.3 V. LEDs 0–7 show the WHO_AM_I byte.
 

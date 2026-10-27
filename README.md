@@ -5,7 +5,7 @@ Xilinx Artix-7 XC7A35T) reads a 6-axis IMU over SPI at 1 kHz, computes tilt from
 CORDIC, fuses it with the integrated gyro in a complementary filter, and streams
 the attitude to a PC over UART.
 
-**Status:** design and verification complete in simulation; hardware bring-up on an Alchitry Au in progress.
+**Status:** design and verification complete in simulation; hardware-in-the-loop build ready for the Alchitry Au; live-IMU bring-up in progress.
 
 The design is verified **bit-exact** against a Python reference model, from the
 CORDIC up through the full SPI → filter → UART chain.
@@ -56,13 +56,14 @@ Vivado's own synthesis and timing report at 100 MHz are the next step. On the Ta
 ## Verification
 
 Golden vectors come from `model/fixed_model.py`, a bit-exact Python model of the
-hardware (same widths, shifts and rounding). Three self-checking testbenches:
+hardware (same widths, shifts and rounding). Four self-checking testbenches:
 
 | Testbench | What it checks | Vectors |
 |---|---|---|
 | `tb_cordic`        | CORDIC angle + magnitude, incl. axes, ±full-scale corners, all four quadrants | 2,733 |
 | `tb_attitude_core` | every roll / pitch / accel-angle output word of the filter | 20,000 samples |
 | `tb_top`           | full board top level (Alchitry Au by default; `-DTANG9K` or `-DBASYS3` for the other boards): IMU init register writes, WHO_AM_I readback, SPI burst reads from a behavioral MPU-6500 model, UART frames decoded and checked (header, checksum, sequence, cal flag, angles) | 2,400 samples / 600 frames |
+| `tb_hil`           | hardware-in-the-loop build: UART sample frames in, 32-bit result frames out; reset command, a corrupted input frame (dropped and counted), PC clock 1 % off nominal, no dropped results | 3,600 results |
 
 The testbenches were mutation-tested: a one-LSB change to the gyro scale constant,
 a ±1 error in one CORDIC branch, and a swapped byte order in the SPI reader each
@@ -96,14 +97,17 @@ cd sim && ./run_all.sh --all-boards    # also runs the system test on the Tang N
 
 ```
 rtl/                  board-independent design: cordic_vec, attitude_core, spi_master,
-                      imu_spi_reader, uart_tx, telemetry_tx, imu_attitude_system
-boards/alchitry_au/   top_alchitry_au.sv, alchitry_au.xdc (pins + clock), synth_check.ys
+                      imu_spi_reader, uart_tx, telemetry_tx, imu_attitude_system,
+                      uart_rx, hil_rx, hil_tx (hardware-in-the-loop)
+boards/alchitry_au/   top_alchitry_au.sv + alchitry_au.xdc (IMU build),
+                      top_alchitry_au_hil.sv + alchitry_au_hil.xdc (HIL build), synth checks
 boards/tang_nano_9k/  top_tang_nano_9k.sv, tang_nano_9k.cst, tang_nano_9k.sdc (alternate board)
 boards/basys3/        top_basys3.sv, basys3.xdc   (alternate board)
 tb/                   tb_cordic, tb_attitude_core, tb_top, mpu_spi_model (IMU slave model)
 model/                fixed_model.py (bit-exact), gen_stimulus.py, compare.py (+ float model, plot)
 sim/                  run_all.sh, generated vectors/ and out/
-tools/                view_serial.py  (live telemetry viewer / CSV logger)
+tools/                view_serial.py (live telemetry viewer / CSV logger),
+                      hil_run.py (hardware-in-the-loop streamer and checker)
 docs/                 attitude_results.png
 ```
 
@@ -115,6 +119,9 @@ docs/                 attitude_results.png
 * **Alchitry Au** (Xilinx Artix-7 XC7A35T-1FTG256) and its USB-C cable.
 * **Alchitry Br breakout**: the Au's I/O pins are on board-to-board connectors, and the Br
   turns them into 0.1" headers for jumper wires.
+  (No Br? The SparkFun edition of the Au has a Qwiic I²C connector; an I²C version of the
+  IMU reader for a Qwiic/STEMMA QT sensor is planned. Until then, use the hardware-in-the-loop
+  build below.)
 * **An SPI-capable 6/9-axis IMU in the MPU-6500 / MPU-9250 family**, e.g. a
   "GY-6500" or "GY-9250" breakout. The reader expects this register map.
   * The common **GY-521 (MPU-6050) is I²C-only and will not work** with this SPI reader.
@@ -181,10 +188,45 @@ Use a **+3.3 V** pin for VCC, not the +5 V pins (A1, A50).
 
 Any other board needs only a thin top level like these and a constraints file.
 
-### If the IMU doesn't arrive: hardware-in-the-loop
-Add a UART receiver that loads `ax..gy` from the PC, and stream
-`sim/vectors/imu_stimulus.hex` from a Python script. The board then reproduces the
-simulation on real silicon, and you can diff its output against `imu_expected.hex`.
+## Hardware-in-the-loop (no IMU needed)
+
+The HIL build runs the real filter on the FPGA with recorded sensor data instead of a live IMU.
+`tools/hil_run.py` streams all 20,000 test samples to the board over the Au's USB-serial link at
+1 Mbaud; the FPGA returns full 32-bit roll/pitch for every sample, and the script checks each one
+against the bit-exact model. It needs only the Au and its USB cable.
+
+```
+PC (hil_run.py) --USB--> uart_rx -> hil_rx -> attitude_core -> hil_tx -> uart_tx --USB--> PC
+```
+
+| Frame | Bytes |
+|---|---|
+| PC → FPGA, sample | `C3 3C` ax ay az gx gy (int16, big-endian) chk (XOR of the 10 data bytes) |
+| PC → FPGA, reset | `C3 E1 1E` (restarts the filter, including gyro calibration) |
+| FPGA → PC, result | `A5 5A` seq roll(u32) pitch(u32) chk (XOR of bytes 2..10) |
+
+Yosys estimate for the HIL build on the XC7A35T: ~980 LUTs, 825 flip-flops, 3 DSP48E1.
+
+**Steps**
+1. **Vivado**: new RTL project, part `xc7a35tftg256-1`. Add `rtl/cordic_vec.sv`,
+   `rtl/attitude_core.sv`, `rtl/uart_rx.sv`, `rtl/uart_tx.sv`, `rtl/hil_rx.sv`, `rtl/hil_tx.sv`,
+   `boards/alchitry_au/top_alchitry_au_hil.sv` (file type SystemVerilog) and
+   `boards/alchitry_au/alchitry_au_hil.xdc`; top = `top_alchitry_au_hil`. In
+   *Settings → Bitstream*, enable **-bin_file**. Run synthesis, implementation and bitstream
+   generation; note the timing summary (WNS at 100 MHz) and utilization.
+2. **Program** the `.bin` with the Alchitry Loader.
+3. **On the PC** (Windows Python, not WSL, so it can open the COM port):
+   ```
+   py -m pip install pyserial numpy matplotlib
+   py tools\hil_run.py --port COM5 --plot hil_results.png --csv hil_results.csv
+   ```
+   The Au appears as two COM ports in Device Manager; the UART is usually the higher number.
+4. Expect `HIL PASS: hardware output is bit-exact with the model`. LED0 blinks while data
+   flows, LED1 lights after gyro calibration, LED2 = a corrupted input frame was seen,
+   LED3 = a result was dropped (should never light).
+
+`py tools\hil_run.py --selftest` runs the same script against a software model of the FPGA,
+to check the PC side without a board.
 
 ## Limitations and next steps
 * The filter treats gyro rates as Euler-angle rates, which is exact for single-axis

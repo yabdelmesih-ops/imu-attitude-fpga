@@ -5,7 +5,7 @@ Xilinx Artix-7 XC7A35T) reads a 6-axis IMU over SPI at 1 kHz, computes tilt from
 CORDIC, fuses it with the integrated gyro in a complementary filter, and streams
 the attitude to a PC over UART.
 
-**Status:** design and verification complete in simulation; hardware-in-the-loop build ready for the Alchitry Au; live-IMU bring-up in progress.
+**Status:** validated on hardware: the hardware-in-the-loop build on the Alchitry Au (Xilinx Artix-7) returns all 20,000 test samples bit-exact with the reference model, and meets timing at 100 MHz (WNS +1.163 ns). Live-IMU bring-up is next.
 
 The design is verified **bit-exact** against a Python reference model, from the
 CORDIC up through the full SPI → filter → UART chain.
@@ -195,6 +195,17 @@ Use a **+3.3 V** pin for VCC, not the +5 V pins (A1, A50).
 Any other board needs only a thin top level like these and a constraints file.
 
 ## Hardware-in-the-loop (no IMU needed)
+
+**Result on the Alchitry Au (Oct 27, 2026):**
+
+```
+samples sent      : 20000
+results received  : 20000
+bit-exact matches : 20000/20000
+lost results      : 0
+time              : 3.94 s (5079 samples/s)
+HIL PASS: hardware output is bit-exact with the model
+```
 
 The HIL build runs the real filter on the FPGA with recorded sensor data instead of a live IMU.
 `tools/hil_run.py` streams all 20,000 test samples to the board over the Au's USB-serial link at

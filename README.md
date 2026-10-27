@@ -207,6 +207,11 @@ time              : 3.94 s (5079 samples/s)
 HIL PASS: hardware output is bit-exact with the model
 ```
 
+![Alchitry Au running the hardware-in-the-loop build](docs/hardware/alchitry_au_running.png)
+
+Vivado 2026.1 post-implementation utilization on the XC7A35T: **1,112 LUTs** (5 % of 20,800),
+**871 flip-flops** (2 % of 41,600), **3 DSP48E1** (of 90), no block RAM.
+
 The HIL build runs the real filter on the FPGA with recorded sensor data instead of a live IMU.
 `tools/hil_run.py` streams all 20,000 test samples to the board over the Au's USB-serial link at
 1 Mbaud; the FPGA returns full 32-bit roll/pitch for every sample, and the script checks each one

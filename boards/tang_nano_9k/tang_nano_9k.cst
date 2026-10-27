@@ -1,0 +1,41 @@
+// Tang Nano 9K physical constraints for top_tang_nano_9k
+// Pin numbers from the Sipeed Tang Nano 9K schematic (Tang_nano_9K_3674).
+// Banks 0-2 are 3.3 V; bank 3 (left side: buttons, LEDs) is 1.8 V.
+// The IMU uses header pins 25-28 on bank 2 (3.3 V). Do NOT move the IMU to a
+// 1.8 V pin: a 3.3 V sensor driving it would exceed the pin's rating.
+
+// 27 MHz on-board oscillator
+IO_LOC  "clk_27m" 52;
+IO_PORT "clk_27m" IO_TYPE=LVCMOS33 PULL_MODE=UP;
+
+// Button S1 = reset (active low, 1.8 V bank)
+IO_LOC  "btn_s1_n" 3;
+IO_PORT "btn_s1_n" IO_TYPE=LVCMOS18 PULL_MODE=UP;
+
+// USB-UART (FPGA TX -> BL702)
+IO_LOC  "uart_txd" 17;
+IO_PORT "uart_txd" IO_TYPE=LVCMOS33 PULL_MODE=UP;
+
+// IMU SPI on the 3.3 V header (bank 2)
+IO_LOC  "imu_cs_n" 25;
+IO_PORT "imu_cs_n" IO_TYPE=LVCMOS33 PULL_MODE=UP DRIVE=8;
+IO_LOC  "imu_mosi" 26;
+IO_PORT "imu_mosi" IO_TYPE=LVCMOS33 PULL_MODE=UP DRIVE=8;
+IO_LOC  "imu_miso" 27;
+IO_PORT "imu_miso" IO_TYPE=LVCMOS33 PULL_MODE=UP;
+IO_LOC  "imu_sclk" 28;
+IO_PORT "imu_sclk" IO_TYPE=LVCMOS33 PULL_MODE=UP DRIVE=8;
+
+// On-board LEDs (active low, 1.8 V bank)
+IO_LOC  "led[0]" 10;
+IO_PORT "led[0]" IO_TYPE=LVCMOS18 PULL_MODE=UP DRIVE=8;
+IO_LOC  "led[1]" 11;
+IO_PORT "led[1]" IO_TYPE=LVCMOS18 PULL_MODE=UP DRIVE=8;
+IO_LOC  "led[2]" 13;
+IO_PORT "led[2]" IO_TYPE=LVCMOS18 PULL_MODE=UP DRIVE=8;
+IO_LOC  "led[3]" 14;
+IO_PORT "led[3]" IO_TYPE=LVCMOS18 PULL_MODE=UP DRIVE=8;
+IO_LOC  "led[4]" 15;
+IO_PORT "led[4]" IO_TYPE=LVCMOS18 PULL_MODE=UP DRIVE=8;
+IO_LOC  "led[5]" 16;
+IO_PORT "led[5]" IO_TYPE=LVCMOS18 PULL_MODE=UP DRIVE=8;

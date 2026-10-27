@@ -1,0 +1,6 @@
+# Open-source synthesis check for the hardware-in-the-loop build on the Alchitry Au.
+#   yosys -s boards/alchitry_au/synth_check_hil.ys
+read_verilog -sv rtl/cordic_vec.sv rtl/attitude_core.sv rtl/uart_tx.sv rtl/uart_rx.sv rtl/hil_rx.sv rtl/hil_tx.sv
+read_verilog -sv boards/alchitry_au/top_alchitry_au_hil.sv
+synth_xilinx -family xc7 -top top_alchitry_au_hil
+tee -o sim/out/synth_au_hil_stat.txt stat

@@ -207,6 +207,8 @@ time              : 3.94 s (5079 samples/s)
 HIL PASS: hardware output is bit-exact with the model
 ```
 
+![Roll and pitch computed by the FPGA hardware vs. ground truth](docs/hardware/hil_results.png)
+
 ![Alchitry Au running the hardware-in-the-loop build](docs/hardware/alchitry_au_running.png)
 
 Vivado 2026.1 post-implementation utilization on the XC7A35T: **1,112 LUTs** (5 % of 20,800),

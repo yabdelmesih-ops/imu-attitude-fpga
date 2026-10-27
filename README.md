@@ -208,7 +208,14 @@ PC (hil_run.py) --USB--> uart_rx -> hil_rx -> attitude_core -> hil_tx -> uart_tx
 Yosys estimate for the HIL build on the XC7A35T: ~980 LUTs, 825 flip-flops, 3 DSP48E1.
 
 **Steps**
-1. **Vivado**: new RTL project, part `xc7a35tftg256-1`. Add `rtl/cordic_vec.sv`,
+1. **Vivado (scripted):** in the Tcl Console (*Window → Tcl Console*), run
+   `source C:/path/to/imu-attitude-fpga/boards/alchitry_au/build_hil.tcl` (forward slashes).
+   It creates the project in `vivado/au_hil/`, runs synthesis and implementation, writes
+   `vivado/au_hil.bin`, saves timing and utilization reports, and prints the worst slack.
+   Vivado 2026.1 needs the free *Vivado Basic Tier* node-locked license, which covers 7 Series
+   devices but not the ILA debug core.
+
+   **Or by hand:** new RTL project, part `xc7a35tftg256-1`. Add `rtl/cordic_vec.sv`,
    `rtl/attitude_core.sv`, `rtl/uart_rx.sv`, `rtl/uart_tx.sv`, `rtl/hil_rx.sv`, `rtl/hil_tx.sv`,
    `boards/alchitry_au/top_alchitry_au_hil.sv` (file type SystemVerilog) and
    `boards/alchitry_au/alchitry_au_hil.xdc`; top = `top_alchitry_au_hil`. In

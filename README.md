@@ -49,7 +49,8 @@ before place-and-route. It accepts all the SystemVerilog with no errors.
 | Flip-flops | 920 | 41,600 | ~2 % |
 | DSP48E1 slices | 3 | 90 | ~3 % |
 
-Vivado's own synthesis and timing report at 100 MHz are the next step. On the Tang Nano 9K
+Vivado 2026.1 place-and-route of the hardware-in-the-loop build meets timing at 100 MHz with
+**WNS +1.163 ns** (after pipelining the filter update; the first build failed at −1.463 ns). On the Tang Nano 9K
 (Gowin GW1NR-9), the same design uses ~1,800 logic cells (~21 %) and 941 flip-flops
 (`boards/tang_nano_9k/synth_check.ys`).
 
@@ -91,7 +92,8 @@ cd sim && ./run_all.sh --all-boards    # also runs the system test on the Tang N
 * **Timing closure.** The first Vivado build of the update step (multiply, add, subtract, shift,
   add in one cycle) failed at 100 MHz with WNS = −1.463 ns across 14 logic levels. The update is now
   pipelined into registered stages that run while the CORDIC computes pitch, costing one cycle
-  of latency (39 → 40) with bit-identical results.
+  of latency (39 → 40) with bit-identical results. Vivado 2026.1 then reports **WNS +1.163 ns** at
+  100 MHz for the hardware-in-the-loop build on the XC7A35T: timing met.
 * **Gyro bias calibration.** The first 1,024 samples are averaged per gyro axis
   and subtracted afterwards. Hold the board still for ~1 s after reset (LED2 lights on the Au).
 * **CDC.** MISO and the reset button pass through synchronizers; the SPI master

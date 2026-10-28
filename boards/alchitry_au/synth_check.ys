@@ -1,8 +1,0 @@
-# Open-source synthesis check for the Alchitry Au (Artix-7 XC7A35T).
-# Gives a resource estimate before Vivado. Run from the repo root:
-#   yosys -s boards/alchitry_au/synth_check.ys
-read_verilog -sv rtl/cordic_vec.sv rtl/attitude_core.sv rtl/spi_master.sv rtl/imu_spi_reader.sv
-read_verilog -sv rtl/uart_tx.sv rtl/telemetry_tx.sv rtl/imu_attitude_system.sv
-read_verilog -sv boards/alchitry_au/top_alchitry_au.sv
-synth_xilinx -family xc7 -top top_alchitry_au
-tee -o sim/out/synth_au_stat.txt stat

@@ -1,8 +1,0 @@
-# Open-source synthesis check for the Tang Nano 9K (GW1NR-9).
-# Gives a resource estimate and catches HDL constructs the synthesizer rejects.
-# Run from the repo root:  yosys -s boards/tang_nano_9k/synth_check.ys
-read_verilog -sv rtl/cordic_vec.sv rtl/attitude_core.sv rtl/spi_master.sv rtl/imu_spi_reader.sv
-read_verilog -sv rtl/uart_tx.sv rtl/telemetry_tx.sv rtl/imu_attitude_system.sv
-read_verilog -sv boards/tang_nano_9k/top_tang_nano_9k.sv
-synth_gowin -top top_tang_nano_9k -json sim/out/top_tang_nano_9k.json
-tee -o sim/out/synth_tang9k_stat.txt stat

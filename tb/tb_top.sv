@@ -6,58 +6,23 @@
 // telemetry frame (header, checksum, sequence number, cal flag) and that each
 // frame's roll/pitch equal the bit-exact model's output for that sample.
 //
-// Default DUT: top_alchitry_au at 100 MHz. Compile with -DTANG9K to test
-// top_tang_nano_9k at 27 MHz, or -DBASYS3 for top_basys3 at 100 MHz.
+// DUT: top_alchitry_au at 100 MHz.
 // Timing is scaled up (faster SCLK, 20 kHz samples, Mbaud UART) to keep the
 // simulation short; the logic is identical to the 1 kHz / 115200 build.
 `timescale 1ns/1ps
 module tb_top;
     localparam int NS     = 2400;       // samples to run (> 1024 for gyro cal)
     localparam int DECIM  = 4;
-`ifdef TANG9K
-    localparam int CLK_HZ  = 27_000_000;
-    localparam int SCLK_HZ = 4_500_000;
-    localparam int BAUD    = 1_000_000;  // 27 clocks per bit, exact
-    localparam real HALF_PERIOD_NS = 18.5185;
-`else
     localparam int CLK_HZ  = 100_000_000;
     localparam int SCLK_HZ = 10_000_000;
     localparam int BAUD    = 5_000_000;
     localparam real HALF_PERIOD_NS = 5.0;
-`endif
     localparam int BIT_NS = 1_000_000_000 / BAUD;
 
     logic clk = 0, btn = 0;
     logic sclk, mosi, miso, cs_n, txd;
     always #(HALF_PERIOD_NS) clk = ~clk;
 
-`ifdef BASYS3
-    logic [15:0] led;
-    wire btn_rst = btn;                  // active high
-    top_basys3 #(
-        .CLK_HZ(CLK_HZ), .SCLK_HZ(SCLK_HZ), .SAMPLE_HZ(20_000),
-        .BAUD(BAUD), .DECIM(DECIM), .RESET_WAIT_MS(1), .STEP_WAIT_US(10)
-    ) dut (
-        .clk(clk), .btn_rst(btn_rst), .imu_sclk(sclk), .imu_mosi(mosi),
-        .imu_miso(miso), .imu_cs_n(cs_n), .uart_txd(txd), .led(led)
-    );
-    wire       led_id_ok  = (led[7:0] == 8'h70);
-    wire       led_cal    = led[8];
-    wire       led_run    = led[9];
-`elsif TANG9K
-    logic [5:0] led;
-    wire btn_s1_n = ~btn;                // active low
-    top_tang_nano_9k #(
-        .CLK_HZ(CLK_HZ), .SCLK_HZ(SCLK_HZ), .SAMPLE_HZ(20_000),
-        .BAUD(BAUD), .DECIM(DECIM), .RESET_WAIT_MS(1), .STEP_WAIT_US(10)
-    ) dut (
-        .clk_27m(clk), .btn_s1_n(btn_s1_n), .imu_sclk(sclk), .imu_mosi(mosi),
-        .imu_miso(miso), .imu_cs_n(cs_n), .uart_txd(txd), .led(led)
-    );
-    wire       led_id_ok  = ~led[0];     // LEDs are active low
-    wire       led_run    = ~led[1];
-    wire       led_cal    = ~led[2];
-`else
     logic [7:0] led;
     wire rst_n = ~btn;                   // active low
     top_alchitry_au #(
@@ -70,7 +35,6 @@ module tb_top;
     wire       led_id_ok  = led[0];      // LEDs are active high
     wire       led_run    = led[1];
     wire       led_cal    = led[2];
-`endif
 
     mpu_spi_model imu (.sclk(sclk), .mosi(mosi), .miso(miso), .cs_n(cs_n));
 

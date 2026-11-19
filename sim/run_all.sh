@@ -19,6 +19,7 @@ run() {   # name, iverilog args...
 RTL=(../rtl/*.sv)
 run tb_cordic      ../rtl/cordic_vec.sv ../tb/tb_cordic.sv
 run tb_attitude    ../rtl/cordic_vec.sv ../rtl/attitude_core.sv ../tb/tb_attitude_core.sv
+run tb_i2c_read_reg ../rtl/i2c_read_reg.sv ../tb/mpu6050_i2c_model.sv ../tb/tb_i2c_read_reg.sv
 run tb_top_au      "${RTL[@]}" ../boards/alchitry_au/top_alchitry_au.sv ../tb/mpu_spi_model.sv ../tb/tb_top.sv   # ~1 min
 run tb_hil         "${RTL[@]}" ../boards/alchitry_au/top_alchitry_au_hil.sv ../tb/tb_hil.sv                       # ~30 s
 

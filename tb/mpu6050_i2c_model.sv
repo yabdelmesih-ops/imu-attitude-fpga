@@ -4,6 +4,9 @@
 //   write:  START, addr+W, reg, data, data, ..., STOP      (register pointer auto-increments)
 //   read:   START, addr+W, reg, repeated START, addr+R, data, data, ..., NACK, STOP
 // It ACKs only its own address, so a wrong address gets a NACK.
+// For system tests it also logs every register write (wlog / n_writes) and
+// fires `burst_done` at the STOP that ends a read, with `start_addr` = the
+// first register read, so the testbench can load the next sensor sample.
 //
 // The bus lines are open-drain: this model only ever pulls SDA low or lets it
 // go. The testbench supplies the pull-up resistors.
@@ -33,18 +36,25 @@ module mpu6050_i2c_model #(
     reg [7:0] shreg = 0, rdata = 0, ptr = 0;
     reg       rw = 0, first_byte = 0, master_nack = 0;
 
-    // Counters the testbench can check
+    // Counters and logs the testbench can check
     integer starts = 0, stops = 0, acks_given = 0;
+    reg [15:0] wlog [0:63];
+    integer    n_writes = 0;
+    reg [7:0]  start_addr = 0;
+    reg        was_read = 0;
+    event      burst_done;
 
     // START or repeated START: SDA falls while SCL is high
     always @(negedge sda) if (scl === 1'b1) begin
         starts = starts + 1;
-        st = S_ADDR; bitcnt = 0; sda_low = 1'b0;
+        st = S_ADDR; bitcnt = 0; sda_low = 1'b0; was_read = 0;
     end
     // STOP: SDA rises while SCL is high
     always @(posedge sda) if (scl === 1'b1) begin
         stops = stops + 1;
         st = S_IDLE; sda_low = 1'b0;
+        if (was_read) -> burst_done;
+        was_read = 0;
     end
 
     // Sample on SCL rising edges
@@ -70,6 +80,7 @@ module mpu6050_i2c_model #(
             S_ADDR_ACK: begin
                 bitcnt = 0;
                 if (rw) begin                    // read: put the first data bit on SDA
+                    was_read = 1; start_addr = ptr;
                     rdata = regs[ptr[6:0]]; ptr = ptr + 1;
                     sda_low = ~rdata[7]; bitcnt = 1;
                     st = S_READ;
@@ -79,7 +90,11 @@ module mpu6050_i2c_model #(
             end
             S_WRITE: if (bitcnt == 8) begin
                 if (first_byte) ptr = shreg;     // first byte = register address
-                else begin regs[ptr[6:0]] = shreg; ptr = ptr + 1; end
+                else begin
+                    if (n_writes < 64) wlog[n_writes] = {ptr, shreg};
+                    n_writes = n_writes + 1;
+                    regs[ptr[6:0]] = shreg; ptr = ptr + 1;
+                end
                 first_byte = 0;
                 sda_low = 1'b1; acks_given = acks_given + 1;
                 st = S_WRITE_ACK;

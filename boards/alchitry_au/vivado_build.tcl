@@ -6,6 +6,7 @@
 #   source C:/path/to/imu-attitude-fpga/boards/alchitry_au/build_hil.tcl
 #   source C:/path/to/imu-attitude-fpga/boards/alchitry_au/build_imu.tcl
 #   source C:/path/to/imu-attitude-fpga/boards/alchitry_au/build_whoami.tcl
+#   source C:/path/to/imu-attitude-fpga/boards/alchitry_au/build_live.tcl
 #
 # (Use forward slashes in the path.) Those files set BUILD and source this one.
 #
@@ -39,13 +40,20 @@ switch -- $BUILD {
                                         boards/alchitry_au/top_alchitry_au.sv]]
         set xdc   boards/alchitry_au/alchitry_au.xdc
     }
+    live {
+        set name  au_live
+        set top   top_alchitry_au_live
+        set srcs  [concat $common [list rtl/i2c_master.sv rtl/mpu6050_i2c_reader.sv \
+                                        rtl/telemetry_tx.sv boards/alchitry_au/top_alchitry_au_live.sv]]
+        set xdc   boards/alchitry_au/alchitry_au_live.xdc
+    }
     whoami {
         set name  au_whoami
         set top   top_alchitry_au_whoami
         set srcs  [list rtl/i2c_read_reg.sv boards/alchitry_au/top_alchitry_au_whoami.sv]
         set xdc   boards/alchitry_au/alchitry_au_whoami.xdc
     }
-    default { error "BUILD must be hil, imu or whoami (got '$BUILD')" }
+    default { error "BUILD must be hil, imu, live or whoami (got '$BUILD')" }
 }
 
 puts "== Building '$name' (top: $top) in $out/$name"

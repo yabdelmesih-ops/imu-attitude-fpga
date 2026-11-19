@@ -22,6 +22,7 @@ run tb_attitude    ../rtl/cordic_vec.sv ../rtl/attitude_core.sv ../tb/tb_attitud
 run tb_i2c_read_reg ../rtl/i2c_read_reg.sv ../tb/mpu6050_i2c_model.sv ../tb/tb_i2c_read_reg.sv
 run tb_top_au      "${RTL[@]}" ../boards/alchitry_au/top_alchitry_au.sv ../tb/mpu_spi_model.sv ../tb/tb_top.sv   # ~1 min
 run tb_hil         "${RTL[@]}" ../boards/alchitry_au/top_alchitry_au_hil.sv ../tb/tb_hil.sv                       # ~30 s
+run tb_top_live   ../rtl/cordic_vec.sv ../rtl/attitude_core.sv ../rtl/uart_tx.sv ../rtl/telemetry_tx.sv ../rtl/i2c_master.sv ../rtl/mpu6050_i2c_reader.sv ../boards/alchitry_au/top_alchitry_au_live.sv ../tb/mpu6050_i2c_model.sv ../tb/tb_top_live.sv   # ~40 s
 
 echo "== analysis"
 python3 ../model/compare.py
